@@ -9,6 +9,9 @@ await fs.mkdir(screenshots, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const failures = [];
 const record = (ok, message) => { if (!ok) failures.push(message); };
+const waitForLogo = async page => {
+  await page.waitForFunction(() => document.documentElement.dataset.logoReady === 'true', null, { timeout: 5000 }).catch(() => {});
+};
 
 const homeViewports = [
   ['desktop', 1440, 900],
@@ -25,6 +28,7 @@ for (const [name, width, height] of homeViewports) {
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
   page.on('requestfailed', request => failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
   const response = await page.goto(`${base}/index.html`, { waitUntil: 'networkidle' });
+  await waitForLogo(page);
   record(response?.ok(), `${name}: homepage returned ${response?.status()}`);
   record((await page.title()).includes('Strategy & Operations Associate'), `${name}: wrong page title`);
   record(await page.locator('h1').isVisible(), `${name}: hero heading not visible`);
@@ -35,14 +39,19 @@ for (const [name, width, height] of homeViewports) {
     const core = document.querySelector('.orbit-core img');
     const box = el => el?.getBoundingClientRect();
     return {
+      ready: document.documentElement.dataset.logoReady,
       headerNatural: header?.naturalWidth || 0,
       coreNatural: core?.naturalWidth || 0,
+      headerSrc: header?.currentSrc || header?.src || '',
+      coreSrc: core?.currentSrc || core?.src || '',
       headerBox: box(header),
       coreBox: box(core),
       overflow: document.documentElement.scrollWidth - window.innerWidth,
     };
   });
-  record(logoState.headerNatural > 0 && logoState.coreNatural > 0, `${name}: logo asset did not paint`);
+  record(logoState.ready === 'true', `${name}: logo runtime did not resolve`);
+  record(logoState.headerSrc.startsWith('data:image/jpeg') && logoState.coreSrc.startsWith('data:image/jpeg'), `${name}: exact supplied JPEG was not used`);
+  record(logoState.headerNatural === 200 && logoState.coreNatural === 200, `${name}: supplied 200x200 logo bytes did not paint`);
   record((logoState.headerBox?.width || 0) >= (width <= 640 ? 38 : 44), `${name}: header logo is too small`);
   record((logoState.coreBox?.width || 0) >= (width <= 640 ? 84 : 108), `${name}: hero logo is too small`);
   record(logoState.overflow <= 1, `${name}: horizontal overflow ${logoState.overflow}px`);
@@ -85,22 +94,25 @@ for (const route of documentRoutes) {
   for (const [name, width, height] of [['tablet',768,1024],['mobile',390,844],['narrow',320,800]]) {
     const page = await browser.newPage({ viewport: { width, height } });
     const errors = [];
+    const failedRequests = [];
     page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+    page.on('requestfailed', request => failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
     const response = await page.goto(`${base}/${route}`, { waitUntil: 'networkidle' });
+    await waitForLogo(page);
     record(response?.ok(), `${route} ${name}: returned ${response?.status()}`);
-    const geometry = await page.evaluate(() => {
-      const sheets = [...document.querySelectorAll('.sheet')];
-      const maxOverflow = document.documentElement.scrollWidth - window.innerWidth;
-      const clipped = sheets.some(sheet => {
-        const rect = sheet.getBoundingClientRect();
-        return [...sheet.children].some(child => child.getBoundingClientRect().bottom > rect.bottom + 2);
-      });
-      return { maxOverflow, clipped, sheets: sheets.length };
-    });
-    record(geometry.sheets > 0, `${route} ${name}: no document sheets`);
-    record(geometry.maxOverflow <= 1, `${route} ${name}: horizontal overflow ${geometry.maxOverflow}px`);
-    record(!geometry.clipped, `${route} ${name}: content extends beyond visible sheet`);
+    record(await page.locator('.preview').isVisible(), `${route} ${name}: preview surface missing`);
+    record(await page.locator('.document-summary').isVisible(), `${route} ${name}: document summary missing`);
+    record(await page.locator('.brand-lockup img').evaluate(img => img.naturalWidth) === 200, `${route} ${name}: TalentPluto logo did not paint`);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    record(overflow <= 1, `${route} ${name}: horizontal overflow ${overflow}px`);
+    if (width <= 700) {
+      record(await page.locator('.mobile-fallback').isVisible(), `${route} ${name}: mobile document fallback missing`);
+      record(!(await page.locator('.frame').isVisible()), `${route} ${name}: embedded PDF should be hidden on mobile`);
+    } else {
+      record(await page.locator('.frame').isVisible(), `${route} ${name}: desktop PDF preview missing`);
+    }
     record(errors.length === 0, `${route} ${name}: console errors: ${errors.join(' | ')}`);
+    record(failedRequests.length === 0, `${route} ${name}: failed requests: ${failedRequests.join(' | ')}`);
     if (name === 'narrow') await page.screenshot({ path: `${screenshots}/${route.replace('.html','')}-narrow.png`, fullPage: true });
     await page.close();
   }
@@ -109,11 +121,11 @@ for (const route of documentRoutes) {
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(`${base}/resume.html`, { waitUntil: 'networkidle' });
-  record(await page.locator('a[href="cover-letter.html"]').isVisible(), 'resume lacks visible cover-letter navigation');
-  record(await page.locator('a[download][href$="Resume.pdf"]').count() === 1, 'resume lacks native PDF download');
+  record(await page.locator('a[href="cover-letter.html"]').first().isVisible(), 'resume lacks visible cover-letter navigation');
+  record(await page.locator('a[download][href$="Resume.pdf"]').count() >= 1, 'resume lacks native PDF download');
   await page.goto(`${base}/cover-letter.html`, { waitUntil: 'networkidle' });
-  record(await page.locator('a[href="resume.html"]').isVisible(), 'cover letter lacks visible resume navigation');
-  record(await page.locator('a[download][href$="Cover-Letter.pdf"]').count() === 1, 'cover letter lacks native PDF download');
+  record(await page.locator('a[href="resume.html"]').first().isVisible(), 'cover letter lacks visible resume navigation');
+  record(await page.locator('a[download][href$="Cover-Letter.pdf"]').count() >= 1, 'cover letter lacks native PDF download');
   await page.close();
 }
 
@@ -124,4 +136,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Rendered QA passed: logo, five homepage viewports, interactions, reduced motion, document reflow, navigation, and downloads.');
+console.log('Rendered QA passed: exact logo bytes, five homepage viewports, interactions, reduced motion, document routes, navigation, and downloads.');
