@@ -1,4 +1,4 @@
-name: Deploy candidate vision
+name: Validate and deploy candidate vision
 
 on:
   push:
@@ -9,17 +9,50 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  statuses: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install validation dependencies
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python -m pip install pypdf
+      - name: Start local campaign
+        run: |
+          python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
+      - name: Validate source, PDFs, and rendered routes
+        run: |
+          python qa/source-contract.py
+          node qa/browser-contract.mjs
+      - name: Upload local QA renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-campaign-qa-${{ github.sha }}
+          path: qa/screenshots
+
   deploy:
+    needs: validate
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
@@ -30,3 +63,99 @@ jobs:
           path: .
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  live-audit:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install live-browser dependency
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Wait for the exact deployed head
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          matched=false
+          for attempt in {1..30}; do
+            if curl -fsSL "$BASE/index.html?sha=$GITHUB_SHA" -o /tmp/live-index.html && cmp -s index.html /tmp/live-index.html; then
+              matched=true
+              break
+            fi
+            sleep 10
+          done
+          test "$matched" = true
+      - name: Match every critical live artifact to main
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          files=(
+            index.html
+            styles.css
+            app.js
+            assets/brand/talentpluto-logo.jpg
+            resume.html
+            cover-letter.html
+            interview-brief.html
+            entry-plan.html
+            client-product-brief.html
+            docs/Russell-Dudek-TalentPluto-Resume.pdf
+            docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf
+            docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf
+            docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf
+            docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf
+          )
+          for path in "${files[@]}"; do
+            mkdir -p "/tmp/live/$(dirname "$path")"
+            curl -fsSL "$BASE/$path?sha=$GITHUB_SHA" -o "/tmp/live/$path"
+            cmp "$path" "/tmp/live/$path"
+          done
+      - name: Run browser QA against GitHub Pages
+        env:
+          SITE_BASE: ${{ needs.deploy.outputs.page_url }}
+          QA_SCREENSHOTS: /tmp/live-screenshots
+          QA_FINDINGS: /tmp/live-findings.txt
+        run: node qa/browser-contract.mjs
+      - name: Upload live QA renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-campaign-qa-${{ github.sha }}
+          path: |
+            /tmp/live-screenshots
+            /tmp/live-findings.txt
+          if-no-files-found: warn
+      - name: Record successful live verification
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"success\",\"context\":\"candidate-campaign/pages-live\",\"description\":\"Exact files and live browser QA passed\",\"target_url\":\"${PAGE_URL}\"}"
+      - name: Record failed live verification
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"failure\",\"context\":\"candidate-campaign/pages-live\",\"description\":\"Live deployment verification failed\",\"target_url\":\"${PAGE_URL}\"}"
