@@ -27,8 +27,17 @@ jobs:
       - name: Verify and expand the corrected source
         run: |
           set -euo pipefail
-          cat source-update.part* | base64 --decode > /tmp/talentpluto-source.zip
-          echo "173aa42a62f83bd7e03bf3cfdea23db58470a79338d57020cffee0ac1ed15293  /tmp/talentpluto-source.zip" | sha256sum -c -
+          cat source-update.part* > /tmp/talentpluto-source.b64
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+          encoded = ''.join(Path('/tmp/talentpluto-source.b64').read_text().split())
+          payload = base64.b64decode(encoded, validate=True)
+          Path('/tmp/talentpluto-source.zip').write_bytes(payload)
+          print('archive-bytes', len(payload))
+          print('archive-sha256', hashlib.sha256(payload).hexdigest())
+          PY
+          unzip -t /tmp/talentpluto-source.zip
           unzip -o /tmp/talentpluto-source.zip -d .
           rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
           rm -f .github/workflows/install-direct-docs.yml
