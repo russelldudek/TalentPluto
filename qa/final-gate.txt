@@ -1,1 +1,0 @@
-Final rendered and artifact QA gate.
