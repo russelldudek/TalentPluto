@@ -3,6 +3,8 @@ name: Validate and deploy candidate vision
 on:
   push:
     branches: [main]
+  pull_request_target:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
