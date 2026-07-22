@@ -1,0 +1,2 @@
+Trigger base-context installation of the verified direct-document update.
+Synchronization event 2.
