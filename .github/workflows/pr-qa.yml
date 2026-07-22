@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.pull_request.head.ref, 'deploy/')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
