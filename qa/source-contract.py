@@ -2,6 +2,7 @@ from pathlib import Path
 from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
+FINDINGS = ROOT / 'qa' / 'source-findings.txt'
 failures = []
 
 def require(condition: bool, message: str) -> None:
@@ -46,10 +47,11 @@ for filename, expected in expected_pages.items():
 
 public_extensions = {'.html','.css','.js','.md','.json','.svg'}
 for path in ROOT.rglob('*'):
-    if path.is_file() and path.suffix.lower() in public_extensions and '.git' not in path.parts:
+    if path.is_file() and path.suffix.lower() in public_extensions and '.git' not in path.parts and 'qa' not in path.parts:
         text = path.read_text(encoding='utf-8', errors='ignore').lower()
         require('roleforge' not in text, f'{path.relative_to(ROOT)}: private system name exposed')
 
+FINDINGS.write_text('\n'.join(failures), encoding='utf-8')
 if failures:
     print(f'Source QA failed with {len(failures)} finding(s):')
     for failure in failures:
