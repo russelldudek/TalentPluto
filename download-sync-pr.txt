@@ -1,1 +1,0 @@
-Dispatch the authoritative PDF synchronization workflow.
