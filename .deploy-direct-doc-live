@@ -1,1 +1,1 @@
-Deploy the current main branch with direct responsive document routes and live byte-for-byte verification.
+Deploy current main with direct responsive document routes and live byte-for-byte verification. Retry after isolating the Pages concurrency group.
