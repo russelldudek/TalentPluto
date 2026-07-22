@@ -1,26 +1,95 @@
-name: Dispatch verified direct-document release
+name: Publish current main to Pages
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  actions: write
   contents: read
+  pages: write
+  id-token: write
+  statuses: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  dispatch:
-    if: github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch the write-capable release job
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Validate direct online documents
+        run: |
+          set -euo pipefail
+          test -s docs.css
+          routes=(resume.html cover-letter.html interview-brief.html entry-plan.html client-product-brief.html)
+          for route in "${routes[@]}"; do
+            test -s "$route"
+            grep -q 'class="sheet"' "$route"
+            if grep -qi '<iframe' "$route"; then
+              echo "$route still contains a PDF pane"
+              exit 1
+            fi
+          done
+          grep -q 'Dear Sahil and the hiring team' cover-letter.html
+          grep -q 'Carpe diem' cover-letter.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify exact live documents
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          routes=(resume.html cover-letter.html interview-brief.html entry-plan.html client-product-brief.html docs.css)
+          matched=false
+          for attempt in {1..36}; do
+            ok=true
+            for route in "${routes[@]}"; do
+              mkdir -p "/tmp/live/$(dirname "$route")"
+              if ! curl -fsSL "$BASE/$route?sha=$GITHUB_SHA&attempt=$attempt" -o "/tmp/live/$route"; then
+                ok=false
+                break
+              fi
+              if ! cmp -s "$route" "/tmp/live/$route"; then
+                ok=false
+                break
+              fi
+            done
+            if [ "$ok" = true ]; then
+              matched=true
+              break
+            fi
+            sleep 10
+          done
+          test "$matched" = true
+          grep -q 'Dear Sahil and the hiring team' /tmp/live/cover-letter.html
+          ! grep -qi '<iframe' /tmp/live/cover-letter.html
+          ! grep -qi '<iframe' /tmp/live/resume.html
+      - name: Record live verification
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
+          MAIN_SHA=$(git rev-parse HEAD)
           curl --fail-with-body -L \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/release-direct-docs.yml/dispatches" \
-            -d '{"ref":"main"}'
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${MAIN_SHA}" \
+            -d "{\"state\":\"success\",\"context\":\"candidate-campaign/pages-live\",\"description\":\"Direct HTML documents verified live\",\"target_url\":\"${PAGE_URL}\"}"
