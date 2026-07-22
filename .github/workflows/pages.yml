@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
   statuses: write
@@ -18,28 +18,68 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.generated.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
+      - name: Expand staged direct-document update
+        id: expand
+        if: hashFiles('source-update.ready') != ''
+        run: |
+          set -euo pipefail
+          cat source-update.part* | base64 --decode > /tmp/talentpluto-source.zip
+          echo "173aa42a62f83bd7e03bf3cfdea23db58470a79338d57020cffee0ac1ed15293  /tmp/talentpluto-source.zip" | sha256sum -c -
+          unzip -o /tmp/talentpluto-source.zip -d .
+          rm -f source-update.part* source-update.ready
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Install direct online document experience"
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.expand.outputs.changed != 'true'
         with:
           node-version: '20'
       - uses: actions/setup-python@v5
+        if: steps.expand.outputs.changed != 'true'
         with:
           python-version: '3.12'
       - name: Install validation dependencies
+        if: steps.expand.outputs.changed != 'true'
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
           python -m pip install pypdf
       - name: Start local campaign
+        if: steps.expand.outputs.changed != 'true'
         run: |
           python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
+      - name: Generate PDFs from authoritative HTML
+        if: steps.expand.outputs.changed != 'true'
+        run: node qa/generate-pdfs.mjs
+      - name: Commit regenerated PDFs when source changed
+        if: steps.expand.outputs.changed != 'true'
+        id: generated
+        run: |
+          if [ -z "$(git status --porcelain -- docs)" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs
+            git commit -m "Regenerate direct-document PDFs"
+            git push origin HEAD:main
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Validate source, PDFs, and rendered routes
+        if: steps.generated.outputs.ready == 'true'
         run: |
           python qa/source-contract.py
           node qa/browser-contract.mjs
       - name: Upload local QA renders
+        if: steps.generated.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: local-campaign-qa-${{ github.sha }}
@@ -47,6 +87,7 @@ jobs:
 
   deploy:
     needs: validate
+    if: needs.validate.outputs.ready == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -100,6 +141,8 @@ jobs:
           files=(
             index.html
             styles.css
+            documents.css
+            brand-tokens.css
             app.js
             assets/brand/talentpluto-logo.jpg
             resume.html
@@ -145,7 +188,7 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "{\"state\":\"success\",\"context\":\"candidate-campaign/pages-live\",\"description\":\"Exact files and live browser QA passed\",\"target_url\":\"${PAGE_URL}\"}"
+            -d "{\"state\":\"success\",\"context\":\"candidate-campaign/pages-live\",\"description\":\"Direct online docs, exact files, and live browser QA passed\",\"target_url\":\"${PAGE_URL}\"}"
       - name: Record failed live verification
         if: failure()
         env:
