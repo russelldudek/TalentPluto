@@ -1,0 +1,29 @@
+{
+  "status":"pass",
+  "site":{
+    "viewports":["1440x900","1280x800","768x1024","390x844","320x800"],
+    "horizontal_overflow":false,
+    "keyboard_interactions":"pass",
+    "rapid_state_selection":"pass",
+    "reduced_motion":"pass",
+    "broken_internal_links":0,
+    "confidential_system_name_matches":0
+  },
+  "documents":{
+    "resume_pages":2,
+    "cover_letter_pages":1,
+    "interview_brief_pages":2,
+    "entry_plan_pages":2,
+    "client_delta_atlas_pages":2,
+    "searchable_text":true,
+    "visual_render_review":"pass",
+    "clipped_text":false,
+    "broken_glyphs":false
+  },
+  "narrative":{
+    "strength_first":true,
+    "source_conflict_disclosed":true,
+    "confidential_partner_not_guessed":true,
+    "claim_drift_detected":false
+  }
+}

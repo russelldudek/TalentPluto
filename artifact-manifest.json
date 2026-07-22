@@ -1,0 +1,19 @@
+{
+  "campaign": "TalentPluto - Strategy & Operations Associate",
+  "candidate": "Russell Dudek",
+  "thesis": "Turn enterprise customization into a compounding product advantage.",
+  "source_boundary": {
+    "target": "The pasted TalentPluto-managed confidential AI search role description",
+    "excluded": "The supplied Ashby URL resolves to a separate Valon role; Valon facts are not used in this campaign."
+  },
+  "artifacts": [
+    {"path":"index.html","type":"interactive candidate vision"},
+    {"path":"docs/Russell-Dudek-TalentPluto-Resume.pdf","type":"resume","pages":2},
+    {"path":"docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf","type":"cover letter","pages":1},
+    {"path":"docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf","type":"interview thesis brief","pages":2},
+    {"path":"docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf","type":"90-day entry plan","pages":2},
+    {"path":"docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf","type":"signature operating brief","pages":2}
+  ],
+  "brand_note": "The neutral lowercase pluto identifier is nominative context, not a recreated or claimed official logo asset.",
+  "status": "audited source and binaries"
+}
