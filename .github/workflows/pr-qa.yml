@@ -1,53 +1,140 @@
-name: Diagnose direct-document archive
+name: Publish direct online documents
 
 on:
   pull_request:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
+  statuses: read
 
 jobs:
-  diagnose:
+  publish:
     if: github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Inspect staged archive
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify and expand the corrected source
         run: |
-          set +e
-          echo '--- staged files ---'
-          ls -l source-update.part[0-9][0-9]
-          echo '--- byte counts ---'
-          wc -c source-update.part[0-9][0-9]
-          echo '--- decode diagnostics ---'
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          import base64, glob, hashlib, traceback, zipfile
+          import base64, glob, hashlib, zipfile
+
           parts = sorted(glob.glob('source-update.part[0-9][0-9]'))
-          print('parts', parts)
-          chunks = []
-          for path in parts:
-              text = Path(path).read_text(encoding='utf-8')
-              compact = ''.join(text.split())
-              print(path, 'raw', len(text), 'compact', len(compact), 'prefix', compact[:8], 'suffix', compact[-8:])
-              chunks.append(compact)
-          encoded = ''.join(chunks)
-          print('encoded-length', len(encoded), 'mod4', len(encoded) % 4)
-          try:
-              payload = base64.b64decode(encoded, validate=True)
-              print('decoded-length', len(payload))
-              print('decoded-sha256', hashlib.sha256(payload).hexdigest())
-              print('decoded-prefix', payload[:8])
-              print('decoded-suffix', payload[-22:])
-              Path('/tmp/talentpluto-source.zip').write_bytes(payload)
-              with zipfile.ZipFile('/tmp/talentpluto-source.zip') as archive:
-                  print('zip-files', len(archive.infolist()))
-                  print('zip-test', archive.testzip())
-                  print('zip-names', archive.namelist())
-          except Exception:
-              traceback.print_exc()
-              raise SystemExit(1)
+          assert parts == [f'source-update.part{i:02d}' for i in range(5)], parts
+          encoded = ''.join(''.join(Path(path).read_text(encoding='utf-8').split()) for path in parts)
+          payload = base64.b64decode(encoded, validate=True)
+          archive_path = Path('/tmp/talentpluto-source.zip')
+          archive_path.write_bytes(payload)
+          print('archive-bytes', len(payload))
+          print('archive-sha256', hashlib.sha256(payload).hexdigest())
+          with zipfile.ZipFile(archive_path) as archive:
+              assert archive.testzip() is None
+              names = set(archive.namelist())
+              required = {
+                  'index.html', 'styles.css', 'documents.css', 'app.js',
+                  'resume.html', 'cover-letter.html', 'interview-brief.html',
+                  'entry-plan.html', 'client-product-brief.html',
+                  'qa/source-contract.py', 'qa/browser-contract.mjs',
+                  'qa/generate-pdfs.mjs', '.github/workflows/pages.yml'
+              }
+              missing = required - names
+              assert not missing, missing
+              archive.extractall('.')
           PY
+          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
+          rm -f .github/workflows/install-direct-docs.yml
+      - name: Install QA dependencies
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python -m pip install pypdf
+      - name: Start the corrected campaign
+        run: |
+          python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
+      - name: Generate PDFs from the authoritative HTML
+        run: node qa/generate-pdfs.mjs
+      - name: Validate source, PDFs, hero geometry, and online documents
+        run: |
+          python qa/source-contract.py
+          node qa/browser-contract.mjs
+      - name: Package the exact verified publication tree
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/talentpluto-release.tgz \
+            index.html styles.css documents.css brand-tokens.css app.js \
+            resume.html cover-letter.html interview-brief.html entry-plan.html client-product-brief.html \
+            assets/brand/talentpluto-logo.jpg \
+            docs/.source-hash \
+            docs/Russell-Dudek-TalentPluto-Resume.pdf \
+            docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf \
+            docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf \
+            docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf \
+            docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf \
+            qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs qa/build_and_audit.py qa/test_document_and_hero.py \
+            .github/workflows/pages.yml README.md campaign-audit.md artifact-manifest.json
+      - name: Publish verified files to the latest main
+        id: publish
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B publication origin/main
+          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
+          rm -f .github/workflows/install-direct-docs.yml
+          tar -xzf /tmp/talentpluto-release.tgz
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish direct online documents and repair hero geometry"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Dispatch the permanent validation and Pages workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pages.yml/dispatches" \
+            -d '{"ref":"main"}'
+      - name: Wait for exact-live verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..120}; do
+            response=$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${FINAL_SHA}/status")
+            state=$(printf '%s' "$response" | jq -r '[.statuses[] | select(.context=="candidate-campaign/pages-live")][0].state // "pending"')
+            echo "Exact-live state: $state"
+            if [ "$state" = "success" ]; then exit 0; fi
+            if [ "$state" = "failure" ] || [ "$state" = "error" ]; then exit 1; fi
+            sleep 10
+          done
+          echo "Timed out waiting for exact-live verification"
+          exit 1
+      - name: Upload corrected render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: direct-online-document-repair
+          path: qa/screenshots
+          if-no-files-found: warn
