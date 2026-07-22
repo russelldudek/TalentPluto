@@ -1,0 +1,1 @@
+Trigger synchronization of downloadable PDFs with the current online document views.
