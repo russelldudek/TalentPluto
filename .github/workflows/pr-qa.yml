@@ -31,13 +31,26 @@ jobs:
           python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
       - name: Validate source and PDFs
+        id: source
+        continue-on-error: true
         run: python qa/source-contract.py
       - name: Validate rendered site
+        id: browser
+        if: always()
+        continue-on-error: true
         run: node qa/browser-contract.mjs
-      - name: Upload QA screenshots
+      - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: preferred-design-qa-screenshots
-          path: qa/screenshots
-          if-no-files-found: ignore
+          name: preferred-design-qa-evidence
+          path: |
+            qa/source-findings.txt
+            qa/browser-findings.txt
+            qa/screenshots
+          if-no-files-found: warn
+      - name: Enforce QA gate
+        if: always()
+        run: |
+          test ! -s qa/source-findings.txt
+          test ! -s qa/browser-findings.txt
