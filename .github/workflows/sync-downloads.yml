@@ -1,0 +1,132 @@
+name: Sync downloadable documents
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  statuses: write
+
+concurrency:
+  group: talentpluto-download-sync
+  cancel-in-progress: false
+
+jobs:
+  synchronize:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install document-generation dependencies
+        run: |
+          python -m pip install playwright==1.55.0 pypdf
+          python -m playwright install --with-deps chromium
+
+      - name: Regenerate downloads from the online document source
+        run: python qa/generate-downloads.py
+
+      - name: Commit synchronized PDF downloads
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/*.pdf
+          if git diff --cached --quiet; then
+            echo "No PDF changes were required."
+          else
+            git commit -m "Synchronize downloadable documents with online views"
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate committed PDF contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from pypdf import PdfReader
+          expected = {
+              'Russell-Dudek-TalentPluto-Resume.pdf': 2,
+              'Russell-Dudek-TalentPluto-Cover-Letter.pdf': 1,
+              'Russell-Dudek-TalentPluto-Interview-Brief.pdf': 2,
+              'Russell-Dudek-TalentPluto-90-Day-Plan.pdf': 2,
+              'Russell-Dudek-TalentPluto-Enterprise-Query-Plan.pdf': 2,
+          }
+          for name, pages in expected.items():
+              path = Path('docs') / name
+              reader = PdfReader(str(path))
+              assert len(reader.pages) == pages, (name, len(reader.pages), pages)
+              text = '\n'.join((p.extract_text() or '') for p in reader.pages)
+              assert len(text.strip()) > 500, (name, len(text.strip()))
+              print(name, pages, path.stat().st_size)
+          PY
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify live document source and downloads
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          files=(
+            docs.css
+            resume.html
+            cover-letter.html
+            interview-brief.html
+            entry-plan.html
+            client-product-brief.html
+            docs/Russell-Dudek-TalentPluto-Resume.pdf
+            docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf
+            docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf
+            docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf
+            docs/Russell-Dudek-TalentPluto-Enterprise-Query-Plan.pdf
+          )
+          for path in "${files[@]}"; do
+            mkdir -p "/tmp/live/$(dirname "$path")"
+            matched=false
+            for attempt in {1..30}; do
+              if curl -fsSL "$BASE/$path?sha=${{ steps.commit.outputs.sha }}" -o "/tmp/live/$path" && cmp -s "$path" "/tmp/live/$path"; then
+                matched=true
+                break
+              fi
+              sleep 10
+            done
+            test "$matched" = true
+          done
+
+      - name: Record successful live synchronization
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          FINAL_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${FINAL_SHA}" \
+            -d "{\"state\":\"success\",\"context\":\"candidate-campaign/downloads-live\",\"description\":\"Online views and downloadable PDFs are synchronized\",\"target_url\":\"${PAGE_URL}\"}"
