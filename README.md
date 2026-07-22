@@ -1,17 +1,28 @@
 # Independent Candidate Vision
 
-This repository publishes Russell Dudek's independent candidate vision for a TalentPluto-managed Strategy & Operations Associate search. It is not affiliated with or endorsed by Pluto or the confidential hiring partner.
+This repository publishes Russell Dudek's independent candidate vision for a TalentPluto-managed Strategy & Operations Associate opportunity in AI search software. It is not affiliated with or endorsed by TalentPluto or the confidential hiring partner.
 
-The campaign includes the candidate vision site, exactly two-page role-aligned resume, exactly one-page cover letter, interview thesis brief, 90-day entry plan, and Client Delta Atlas operating brief.
+The campaign includes:
 
-## Source boundary
+- the interactive candidate vision;
+- an exactly two-page role-aligned resume;
+- an exactly one-page cover letter;
+- an interview thesis brief;
+- a 90-day entry plan;
+- the Client-to-Product Translation System.
 
-The supplied Ashby URL resolves to a separate Valon role. The campaign therefore treats the pasted TalentPluto job description as the target and excludes Valon company, compensation, location, and role claims. The confidential hiring partner is not guessed.
+## Candidate thesis
 
-## Brand note
+**Turn every enterprise engagement into product advantage.**
 
-The experience follows public Pluto visual cues: warm cream surfaces, high-contrast black editorial typography, rounded conversational UI, and direct copy. A downloadable official logo file was not retrievable in the connected research environment, so the local text-only `pluto` identifier is explicitly documented as non-official nominative context rather than presented as a recreated logo.
+The campaign treats customer onboarding, customization, prototyping, product discovery, and roadmap learning as one closed-loop operating system rather than separate consulting and product-management activities.
 
-## Publication and QA
+## Brand and source boundary
 
-GitHub Pages deploys from `main` through the committed workflow. `campaign-audit.md`, `artifact-manifest.json`, and `qa/qa-results.json` record the local source, PDF, responsive, interaction, reduced-motion, and document checks used before publication.
+The supplied TalentPluto mark is committed locally under `assets/brand/` and used for nominative identification. The blue, white, dark-ink, and lime-accent visual system is an independent candidate interpretation, not official corporate collateral.
+
+The pasted TalentPluto job description is the target source. The confidential hiring partner is not guessed or represented as confirmed.
+
+## Publication
+
+GitHub Pages deploys from `main` through `.github/workflows/pages.yml`. The site and document routes use repository-safe relative paths.
