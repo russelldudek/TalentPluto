@@ -1,7 +1,24 @@
 # Brand intelligence
 
-The candidate campaign uses a restrained interpretation of public Pluto visual cues: warm cream surfaces, high-contrast black editorial typography, rounded conversational controls, direct copy, and a limited accent palette.
+## Identity
 
-A downloadable official logo file was not available through the connected research path. The local lowercase `pluto` SVG is therefore documented as a neutral, non-official typeset identifier used only to identify the recruiting context. It is not presented as a trademark recreation or endorsement.
+The campaign uses the supplied TalentPluto mark for nominative identification. The source image is preserved inside locally committed SVG wrappers under `assets/brand/`; it is not traced, redrawn, recolored, or animated.
 
-The visual metaphor is derived from the work itself: stacked account layers settling onto a reusable product core. This differentiates the campaign from prior RoleForge cases while making the client-to-product thesis visible rather than merely claimed.
+## Color system
+
+- TalentPluto blue: source-sampled from the supplied mark.
+- White and dark ink: neutral supporting colors.
+- Lime: candidate-original accent used only to signal learning, evidence, and decision return.
+- Pale blue and cool gray: candidate-original supporting surfaces.
+
+The employer-recognition layer remains blue and white. Candidate-original colors are subordinate to the role-derived operating system.
+
+## Typography
+
+The campaign uses broadly available humanist sans-serif fallbacks: Avenir Next, Segoe UI, Helvetica, and Arial. No proprietary font files are copied or committed.
+
+## Role-derived visual system
+
+The production concept is the Client-to-Product Translation System. A four-part decision record moves from account context to legitimate client delta, prototype evidence, and product disposition. Scenario selection changes the evidence threshold, human authority, recommended posture, and learning return.
+
+The visual language uses one dominant circular learning loop in the hero, a horizontal translation spine in the interactive system, and restrained editorial evidence and entry-plan rails. It is an independent candidate work product and does not imitate an official TalentPluto application or employee interface.
