@@ -47,14 +47,13 @@ jobs:
                   'resume.html', 'cover-letter.html', 'interview-brief.html',
                   'entry-plan.html', 'client-product-brief.html',
                   'qa/source-contract.py', 'qa/browser-contract.mjs',
-                  'qa/generate-pdfs.mjs', '.github/workflows/pages.yml'
+                  'qa/generate-pdfs.mjs'
               }
               missing = required - names
               assert not missing, missing
               archive.extractall('.')
           PY
           rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
-          rm -f .github/workflows/install-direct-docs.yml
       - name: Install QA dependencies
         run: |
           npm install --no-save playwright@1.55.0
@@ -84,7 +83,7 @@ jobs:
             docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf \
             docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf \
             qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs \
-            .github/workflows/pages.yml README.md campaign-audit.md artifact-manifest.json
+            README.md campaign-audit.md artifact-manifest.json
       - name: Publish verified files to the latest main
         id: publish
         run: |
@@ -92,7 +91,6 @@ jobs:
           git fetch origin main
           git checkout -B publication origin/main
           rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
-          rm -f .github/workflows/install-direct-docs.yml
           tar -xzf /tmp/talentpluto-release.tgz
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
