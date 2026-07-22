@@ -1,7 +1,3 @@
-const brandScript=document.createElement('script');
-brandScript.src='brand-runtime.js';
-document.head.appendChild(brandScript);
-
 const scenarios={
   onboarding:{context:'Business objective, visibility gap, data environment, owner.',delta:'Configure the shared product; instrument the client-specific delta.',proof:'Confirm task fit, data quality, adoption path, and measurable outcome.',decision:'Configure now. Return evidence to the roadmap review.',posture:'Configure the core. Instrument the delta.',evidence:'Outcome · repeatability · owner',authority:'Account lead + product owner',return:'Onboarding playbook + roadmap signal',active:1},
   attribution:{context:'Define the executive question, data sources, causal limits, and decision owner.',delta:'Keep the platform model stable; isolate the customer attribution layer.',proof:'Test CRM linkage, counterfactual logic, evaluation method, and decision usefulness.',decision:'Prototype with bounded claims before any product commitment.',posture:'Prototype the attribution layer. Preserve data boundaries.',evidence:'CRM linkage · causality · evaluation',authority:'Analytics owner + product',return:'Reusable attribution pattern + limits',active:2},
