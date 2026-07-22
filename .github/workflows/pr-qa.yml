@@ -2,7 +2,7 @@ name: Preferred design QA
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, qa/preferred-base]
   workflow_dispatch:
 
 permissions:
