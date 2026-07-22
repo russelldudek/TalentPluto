@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 
 const base = 'http://127.0.0.1:4173';
 const screenshots = 'qa/screenshots';
+const findingsPath = 'qa/browser-findings.txt';
 await fs.mkdir(screenshots, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
@@ -117,6 +118,7 @@ for (const route of documentRoutes) {
 }
 
 await browser.close();
+await fs.writeFile(findingsPath, failures.join('\n'), 'utf8');
 if (failures.length) {
   console.error(`QA failed with ${failures.length} finding(s):`);
   failures.forEach(failure => console.error(`- ${failure}`));
