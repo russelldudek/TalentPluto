@@ -9,9 +9,7 @@ await fs.mkdir(screenshots, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const failures = [];
 const record = (ok, message) => { if (!ok) failures.push(message); };
-const waitForLogo = async page => {
-  await page.waitForFunction(() => document.documentElement.dataset.logoReady === 'true', null, { timeout: 5000 }).catch(() => {});
-};
+const meaningfulFailure = request => !request.url().toLowerCase().endsWith('.pdf');
 
 const homeViewports = [
   ['desktop', 1440, 900],
@@ -26,9 +24,8 @@ for (const [name, width, height] of homeViewports) {
   const consoleErrors = [];
   const failedRequests = [];
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
-  page.on('requestfailed', request => failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
+  page.on('requestfailed', request => { if (meaningfulFailure(request)) failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`); });
   const response = await page.goto(`${base}/index.html`, { waitUntil: 'networkidle' });
-  await waitForLogo(page);
   record(response?.ok(), `${name}: homepage returned ${response?.status()}`);
   record((await page.title()).includes('Strategy & Operations Associate'), `${name}: wrong page title`);
   record(await page.locator('h1').isVisible(), `${name}: hero heading not visible`);
@@ -39,7 +36,6 @@ for (const [name, width, height] of homeViewports) {
     const core = document.querySelector('.orbit-core img');
     const box = el => el?.getBoundingClientRect();
     return {
-      ready: document.documentElement.dataset.logoReady,
       headerNatural: header?.naturalWidth || 0,
       coreNatural: core?.naturalWidth || 0,
       headerSrc: header?.currentSrc || header?.src || '',
@@ -49,9 +45,8 @@ for (const [name, width, height] of homeViewports) {
       overflow: document.documentElement.scrollWidth - window.innerWidth,
     };
   });
-  record(logoState.ready === 'true', `${name}: logo runtime did not resolve`);
-  record(logoState.headerSrc.startsWith('data:image/jpeg') && logoState.coreSrc.startsWith('data:image/jpeg'), `${name}: exact supplied JPEG was not used`);
-  record(logoState.headerNatural === 200 && logoState.coreNatural === 200, `${name}: supplied 200x200 logo bytes did not paint`);
+  record(logoState.headerSrc.endsWith('/assets/brand/talentpluto-logo.jpg') && logoState.coreSrc.endsWith('/assets/brand/talentpluto-logo.jpg'), `${name}: native supplied JPEG was not used`);
+  record(logoState.headerNatural === 200 && logoState.coreNatural === 200, `${name}: supplied 200x200 logo did not paint`);
   record((logoState.headerBox?.width || 0) >= (width <= 640 ? 38 : 44), `${name}: header logo is too small`);
   record((logoState.coreBox?.width || 0) >= (width <= 640 ? 84 : 108), `${name}: hero logo is too small`);
   record(logoState.overflow <= 1, `${name}: horizontal overflow ${logoState.overflow}px`);
@@ -96,13 +91,13 @@ for (const route of documentRoutes) {
     const errors = [];
     const failedRequests = [];
     page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-    page.on('requestfailed', request => failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
+    page.on('requestfailed', request => { if (meaningfulFailure(request)) failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`); });
     const response = await page.goto(`${base}/${route}`, { waitUntil: 'networkidle' });
-    await waitForLogo(page);
     record(response?.ok(), `${route} ${name}: returned ${response?.status()}`);
     record(await page.locator('.preview').isVisible(), `${route} ${name}: preview surface missing`);
     record(await page.locator('.document-summary').isVisible(), `${route} ${name}: document summary missing`);
-    record(await page.locator('.brand-lockup img').evaluate(img => img.naturalWidth) === 200, `${route} ${name}: TalentPluto logo did not paint`);
+    const logo = await page.locator('.brand-lockup img').evaluate(img => ({ naturalWidth: img.naturalWidth, src: img.currentSrc || img.src }));
+    record(logo.naturalWidth === 200 && logo.src.endsWith('/assets/brand/talentpluto-logo.jpg'), `${route} ${name}: native TalentPluto logo did not paint`);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     record(overflow <= 1, `${route} ${name}: horizontal overflow ${overflow}px`);
     if (width <= 700) {
@@ -111,6 +106,9 @@ for (const route of documentRoutes) {
     } else {
       record(await page.locator('.frame').isVisible(), `${route} ${name}: desktop PDF preview missing`);
     }
+    const pdfHref = await page.locator('a[download][href$=".pdf"]').first().getAttribute('href');
+    const pdfResponse = await page.request.get(`${base}/${pdfHref}`);
+    record(pdfResponse.ok(), `${route} ${name}: PDF returned ${pdfResponse.status()}`);
     record(errors.length === 0, `${route} ${name}: console errors: ${errors.join(' | ')}`);
     record(failedRequests.length === 0, `${route} ${name}: failed requests: ${failedRequests.join(' | ')}`);
     if (name === 'narrow') await page.screenshot({ path: `${screenshots}/${route.replace('.html','')}-narrow.png`, fullPage: true });
@@ -136,4 +134,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Rendered QA passed: exact logo bytes, five homepage viewports, interactions, reduced motion, document routes, navigation, and downloads.');
+console.log('Rendered QA passed: native supplied logo, five homepage viewports, interactions, reduced motion, document routes, navigation, and downloads.');
