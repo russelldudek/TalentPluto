@@ -4,13 +4,14 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   release:
-    if: github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,13 +59,7 @@ jobs:
           python qa/source-contract.py
           node qa/browser-contract.mjs
       - name: Preserve main workflow files outside the release commit
-        run: |
-          git show origin/main:.github/workflows/pages.yml > /tmp/pages.yml
-          git show origin/main:.github/workflows/install-direct-docs.yml > /tmp/install-direct-docs.yml
-          git show origin/main:.github/workflows/release-direct-docs.yml > /tmp/release-direct-docs.yml
-          cp /tmp/pages.yml .github/workflows/pages.yml
-          cp /tmp/install-direct-docs.yml .github/workflows/install-direct-docs.yml
-          cp /tmp/release-direct-docs.yml .github/workflows/release-direct-docs.yml
+        run: git checkout origin/main -- .github/workflows
       - name: Commit the clean verified release branch
         run: |
           set -euo pipefail
