@@ -1,9 +1,9 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
-const base = 'http://127.0.0.1:4173';
-const screenshots = 'qa/screenshots';
-const findingsPath = 'qa/browser-findings.txt';
+const base = (process.env.SITE_BASE || 'http://127.0.0.1:4173').replace(/\/$/, '');
+const screenshots = process.env.QA_SCREENSHOTS || 'qa/screenshots';
+const findingsPath = process.env.QA_FINDINGS || 'qa/browser-findings.txt';
 await fs.mkdir(screenshots, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
