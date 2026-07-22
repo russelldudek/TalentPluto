@@ -1,19 +1,42 @@
 {
   "campaign": "TalentPluto - Strategy & Operations Associate",
-  "candidate": "Russell Dudek",
+  "status": "audited source ready for live verification",
+  "live_url": "https://russelldudek.github.io/TalentPluto/",
+  "target_source": "User-supplied TalentPluto job description for a confidential AI-search partner",
+  "excluded_source": "The supplied Ashby URL resolves to a separate Valon role and is excluded from campaign claims",
   "thesis": "Turn enterprise customization into a compounding product advantage.",
-  "source_boundary": {
-    "target": "The pasted TalentPluto-managed confidential AI search role description",
-    "excluded": "The supplied Ashby URL resolves to a separate Valon role; Valon facts are not used in this campaign."
-  },
-  "artifacts": [
-    {"path":"index.html","type":"interactive candidate vision"},
-    {"path":"docs/Russell-Dudek-TalentPluto-Resume.pdf","type":"resume","pages":2},
-    {"path":"docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf","type":"cover letter","pages":1},
-    {"path":"docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf","type":"interview thesis brief","pages":2},
-    {"path":"docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf","type":"90-day entry plan","pages":2},
-    {"path":"docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf","type":"signature operating brief","pages":2}
+  "operating_artifact": "Client Delta Atlas",
+  "source_files": [
+    "index.html",
+    "styles.css",
+    "app.js",
+    "resume.html",
+    "cover-letter.html",
+    "interview-brief.html",
+    "entry-plan.html",
+    "client-product-brief.html",
+    "docs.css",
+    "brand-intelligence.md",
+    "campaign-audit.md",
+    "sources/source-notes.md",
+    "assets/brand/talentpluto-logo.svg"
   ],
-  "brand_note": "The neutral lowercase pluto identifier is nominative context, not a recreated or claimed official logo asset.",
-  "status": "audited source and binaries"
+  "documents": [
+    {"path":"docs/Russell-Dudek-TalentPluto-Resume.pdf","pages":2,"sha256":"feb8e6881abcbd3cb0d5d18509ac3627bd3e730cebfc6f216c251a142a685fdd"},
+    {"path":"docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf","pages":1,"sha256":"fd6f343fd740c288cb976e28569a192449897b3c3a9636054f49302f782a6704"},
+    {"path":"docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf","pages":2,"sha256":"4751a839a1bad3056efc6e736fadaeff385f4c48e2f0ba9ce769e4051c4be84f"},
+    {"path":"docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf","pages":2,"sha256":"6d246136dcc5d7065da06f917140f599223321765cd9b7d0029e9efddee4f796"},
+    {"path":"docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf","pages":2,"sha256":"2eb26484329f2e4bbad623f2c341ae8ca66cbc2a9cdf4372bc9b30cee69a9857"}
+  ],
+  "qa": {
+    "viewports": ["1440x900","1280x800","768x1024","390x844","320x800"],
+    "responsive": "passed",
+    "keyboard_interaction": "passed",
+    "rapid_selection_settlement": "passed",
+    "reduced_motion": "passed",
+    "screen_document_reflow": "passed",
+    "exact_pdf_pagination": "passed",
+    "candidate_facing_confidentiality": "passed",
+    "public_deficit_framing": "absent"
+  }
 }

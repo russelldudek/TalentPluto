@@ -1,7 +1,14 @@
-# Source notes
+# Source Notes
 
-- Primary target source: the job description pasted by Russell Dudek for a TalentPluto-managed confidential Strategy & Operations Associate search in AI search software.
-- Conflicting source: the supplied Ashby URL resolves to Valon's Applied AI Strategist, New Ventures role. Valon company, compensation, location, and role facts are excluded.
-- Candidate evidence: verified RoleForge candidate evidence and portfolio memory refreshed from the private canonical repository before campaign construction.
-- Public research: TalentPluto's public company and recruiting context, plus publicly visible Pluto design cues.
-- Company-specific operating ideas in the campaign are labeled as candidate hypotheses or proposed mechanisms, not represented as documented internal facts.
+- Role scope: user-supplied TalentPluto Strategy & Operations Associate description for a confidential AI-search partner.
+- Supplied Ashby URL: resolves to a separate Valon posting and is excluded from campaign claims.
+- TalentPluto official site: https://talentpluto.com/
+- TalentPluto companies page: https://talentpluto.com/companies
+- Y Combinator company profile: https://www.ycombinator.com/companies/talentpluto
+- Brand mark: user-supplied `assets/brand/talentpluto-logo.svg`, visually consistent with Pluto's public YC mark.
+- Candidate evidence: verified candidate evidence record; public artifacts use verified facts only.
+
+## Integrity notes
+- The confidential hiring partner is not identified or guessed.
+- No internal company metrics, customers, product architecture, attribution methods, reporting lines, or operating conditions are claimed.
+- Company-state statements in candidate materials are posting-derived observations or explicitly labeled hypotheses for discovery.

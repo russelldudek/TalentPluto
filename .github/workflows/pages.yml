@@ -1,4 +1,4 @@
-name: Expand corrected campaign package
+name: Deploy candidate vision
 
 on:
   push:
@@ -6,40 +6,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: campaign-package
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  expand:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
+      - name: Check out audited source
         uses: actions/checkout@v4
-      - name: Expand package when present
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          chunks=(campaign-package/chunk-*)
-          if [ ${#chunks[@]} -eq 0 ]; then
-            echo "Campaign package not present; awaiting payload."
-            exit 0
-          fi
-          test -f assets/brand/talentpluto-logo.svg
-          cp assets/brand/talentpluto-logo.svg /tmp/talentpluto-logo.svg
-          cat "${chunks[@]}" | base64 --decode > /tmp/talentpluto-final.tar.xz
-          echo "c4c92496b2f22b6bdde28515931bb4b4d667926d9fd2e2456c0bf6b99f6154b5  /tmp/talentpluto-final.tar.xz" | sha256sum --check -
-          mkdir -p /tmp/talentpluto-final
-          tar -xJf /tmp/talentpluto-final.tar.xz -C /tmp/talentpluto-final
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -a /tmp/talentpluto-final/. .
-          mkdir -p assets/brand
-          cp /tmp/talentpluto-logo.svg assets/brand/talentpluto-logo.svg
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Publish corrected TalentPluto candidate campaign"
-          git push
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload static campaign
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
