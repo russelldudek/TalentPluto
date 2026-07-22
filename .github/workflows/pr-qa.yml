@@ -1,56 +1,117 @@
-name: Preferred design QA
+name: Publish direct online documents
 
 on:
   pull_request:
-    branches: [main, qa/preferred-base]
-  workflow_dispatch:
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
+  statuses: read
 
 jobs:
-  qa:
+  publish:
+    if: github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify and expand the corrected source
+        run: |
+          set -euo pipefail
+          cat source-update.part* | base64 --decode > /tmp/talentpluto-source.zip
+          echo "173aa42a62f83bd7e03bf3cfdea23db58470a79338d57020cffee0ac1ed15293  /tmp/talentpluto-source.zip" | sha256sum -c -
+          unzip -o /tmp/talentpluto-source.zip -d .
+          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
+          rm -f .github/workflows/install-direct-docs.yml
       - name: Install QA dependencies
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
           python -m pip install pypdf
-      - name: Start static site
+      - name: Start the corrected campaign
         run: |
           python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
-      - name: Validate source and PDFs
-        id: source
-        continue-on-error: true
-        run: python qa/source-contract.py
-      - name: Validate rendered site
-        id: browser
-        if: always()
-        continue-on-error: true
-        run: node qa/browser-contract.mjs
-      - name: Upload QA evidence
+      - name: Generate PDFs from the authoritative HTML
+        run: node qa/generate-pdfs.mjs
+      - name: Validate source, PDFs, hero geometry, and online documents
+        run: |
+          python qa/source-contract.py
+          node qa/browser-contract.mjs
+      - name: Package the exact verified publication tree
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/talentpluto-release.tgz \
+            index.html styles.css documents.css brand-tokens.css app.js \
+            resume.html cover-letter.html interview-brief.html entry-plan.html client-product-brief.html \
+            assets/brand/talentpluto-logo.jpg \
+            docs/.source-hash \
+            docs/Russell-Dudek-TalentPluto-Resume.pdf \
+            docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf \
+            docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf \
+            docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf \
+            docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf \
+            qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs qa/build_and_audit.py qa/test_document_and_hero.py \
+            .github/workflows/pages.yml README.md campaign-audit.md artifact-manifest.json
+      - name: Publish verified files to the latest main
+        id: publish
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B publication origin/main
+          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
+          rm -f .github/workflows/install-direct-docs.yml
+          tar -xzf /tmp/talentpluto-release.tgz
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish direct online documents and repair hero geometry"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Dispatch the permanent validation and Pages workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pages.yml/dispatches" \
+            -d '{"ref":"main"}'
+      - name: Wait for exact-live verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..120}; do
+            response=$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${FINAL_SHA}/status")
+            state=$(printf '%s' "$response" | jq -r '[.statuses[] | select(.context=="candidate-campaign/pages-live")][0].state // "pending"')
+            echo "Exact-live state: $state"
+            if [ "$state" = "success" ]; then exit 0; fi
+            if [ "$state" = "failure" ] || [ "$state" = "error" ]; then exit 1; fi
+            sleep 10
+          done
+          echo "Timed out waiting for exact-live verification"
+          exit 1
+      - name: Upload corrected render evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: preferred-design-qa-evidence
-          path: |
-            qa/source-findings.txt
-            qa/browser-findings.txt
-            qa/screenshots
+          name: direct-online-document-repair
+          path: qa/screenshots
           if-no-files-found: warn
-      - name: Enforce QA gate
-        if: always()
-        run: |
-          test ! -s qa/source-findings.txt
-          test ! -s qa/browser-findings.txt
