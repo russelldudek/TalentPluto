@@ -1,17 +1,20 @@
 name: Install direct online documents
 
 on:
-  push:
-    branches: [main]
+  issues:
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   install:
+    if: github.event.issue.title == 'Install direct online documents'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Verify and install staged source
         run: |
           set -euo pipefail
@@ -19,7 +22,7 @@ jobs:
           cat source-update.part* | base64 --decode > /tmp/talentpluto-source.zip
           echo "173aa42a62f83bd7e03bf3cfdea23db58470a79338d57020cffee0ac1ed15293  /tmp/talentpluto-source.zip" | sha256sum -c -
           unzip -o /tmp/talentpluto-source.zip -d .
-          rm -f source-update.part* source-update.ready
+          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
           rm -f .github/workflows/install-direct-docs.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
