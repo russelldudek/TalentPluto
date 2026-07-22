@@ -1,93 +1,26 @@
-name: Build verified direct-document release
+name: Dispatch verified direct-document release
 
 on:
   pull_request:
     branches: [main]
 
 permissions:
-  contents: write
+  actions: write
+  contents: read
 
 jobs:
-  release:
+  dispatch:
     if: github.event.pull_request.head.ref == 'agent/direct-doc-trigger'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Verify and expand the corrected source
+      - name: Dispatch the write-capable release job
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import base64, glob, hashlib, zipfile
-
-          parts = sorted(glob.glob('source-update.part[0-9][0-9]'))
-          assert parts == [f'source-update.part{i:02d}' for i in range(5)], parts
-          encoded = ''.join(''.join(Path(path).read_text(encoding='utf-8').split()) for path in parts)
-          payload = base64.b64decode(encoded, validate=True)
-          archive_path = Path('/tmp/talentpluto-source.zip')
-          archive_path.write_bytes(payload)
-          print('archive-bytes', len(payload))
-          print('archive-sha256', hashlib.sha256(payload).hexdigest())
-          with zipfile.ZipFile(archive_path) as archive:
-              assert archive.testzip() is None
-              archive.extractall('.')
-          PY
-          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
-      - name: Install QA dependencies
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
-          python -m pip install pypdf
-      - name: Start the corrected campaign
-        run: |
-          python -m http.server 4173 --bind 127.0.0.1 > /tmp/talentpluto-server.log 2>&1 &
-          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break; sleep 1; done
-      - name: Generate PDFs from the authoritative HTML
-        run: node qa/generate-pdfs.mjs
-      - name: Validate source, PDFs, hero geometry, and online documents
-        run: |
-          python qa/source-contract.py
-          node qa/browser-contract.mjs
-      - name: Package the exact verified publication tree
-        run: |
-          set -euo pipefail
-          tar -czf /tmp/talentpluto-release.tgz \
-            index.html styles.css documents.css brand-tokens.css app.js \
-            resume.html cover-letter.html interview-brief.html entry-plan.html client-product-brief.html \
-            assets/brand/talentpluto-logo.jpg \
-            docs/.source-hash \
-            docs/Russell-Dudek-TalentPluto-Resume.pdf \
-            docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf \
-            docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf \
-            docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf \
-            docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf \
-            qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs \
-            README.md campaign-audit.md artifact-manifest.json
-      - name: Push the verified release branch
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          git checkout -B direct-doc-release origin/main
-          rm -f source-update.part* source-update.ready source-update.trigger direct-doc-trigger.txt
-          tar -xzf /tmp/talentpluto-release.tgz
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Publish direct online documents and repair hero geometry"
-          git push --force origin HEAD:agent/direct-doc-release
-      - name: Upload corrected render evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: direct-online-document-repair
-          path: qa/screenshots
-          if-no-files-found: warn
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/release-direct-docs.yml/dispatches" \
+            -d '{"ref":"main"}'
