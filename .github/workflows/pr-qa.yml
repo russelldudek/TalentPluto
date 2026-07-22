@@ -83,7 +83,7 @@ jobs:
             docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf \
             docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf \
             docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf \
-            qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs qa/build_and_audit.py qa/test_document_and_hero.py \
+            qa/source-contract.py qa/browser-contract.mjs qa/generate-pdfs.mjs \
             .github/workflows/pages.yml README.md campaign-audit.md artifact-manifest.json
       - name: Publish verified files to the latest main
         id: publish
