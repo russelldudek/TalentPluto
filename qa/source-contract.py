@@ -1,4 +1,5 @@
 from pathlib import Path
+from hashlib import sha256
 from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,8 +13,10 @@ def require(condition: bool, message: str) -> None:
 index = (ROOT / 'index.html').read_text(encoding='utf-8')
 styles = (ROOT / 'styles.css').read_text(encoding='utf-8')
 app = (ROOT / 'app.js').read_text(encoding='utf-8')
+logo_path = ROOT / 'assets' / 'brand' / 'talentpluto-logo.jpg'
 
-require(index.count('assets/brand/talentpluto-logo.svg') >= 2, 'TalentPluto logo must appear in header and hero')
+require(index.count('assets/brand/talentpluto-logo.jpg') >= 2, 'TalentPluto logo must appear in header and hero')
+require('talentpluto-logo.svg' not in index, 'homepage still uses the broken SVG logo wrapper')
 require('class="identity"' in index and 'class="orbit-core"' in index, 'preferred identity and hero composition missing')
 require('Enterprise Query Plan' not in index, 'superseded redesign is still present')
 require('system-orbit' in index and 'Client-to-Product Translation System' in index, 'preferred client-to-product concept missing')
@@ -21,14 +24,25 @@ require('@media(max-width:640px)' in styles, 'narrow-phone treatment missing')
 require('@media(prefers-reduced-motion:reduce)' in styles, 'reduced-motion treatment missing')
 require("['ArrowLeft','ArrowRight','Home','End']" in app, 'keyboard control contract missing')
 require("applyScenario('onboarding')" in app, 'useful baseline state missing')
+require(logo_path.is_file(), 'native TalentPluto JPEG is missing')
+if logo_path.is_file():
+    logo_bytes = logo_path.read_bytes()
+    require(logo_bytes[:2] == b'\xff\xd8' and logo_bytes[-2:] == b'\xff\xd9', 'TalentPluto logo is not a valid JPEG')
+    require(sha256(logo_bytes).hexdigest() == '5f18f4586982f5a324e57b197f43f482f30bc964a0a6945882ef75c2f60b89f2', 'TalentPluto logo bytes differ from the supplied image')
 
 for required in [
     'resume.html','cover-letter.html','interview-brief.html','entry-plan.html','client-product-brief.html',
-    'assets/brand/talentpluto-logo.svg','docs/Russell-Dudek-TalentPluto-Resume.pdf',
-    'docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf','docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf',
-    'docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf','docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf'
+    'docs/Russell-Dudek-TalentPluto-Resume.pdf','docs/Russell-Dudek-TalentPluto-Cover-Letter.pdf',
+    'docs/Russell-Dudek-TalentPluto-Interview-Brief.pdf','docs/Russell-Dudek-TalentPluto-90-Day-Plan.pdf',
+    'docs/Russell-Dudek-TalentPluto-Client-Delta-Atlas.pdf'
 ]:
     require((ROOT / required).is_file(), f'missing required artifact: {required}')
+
+for route in ['resume.html','cover-letter.html','interview-brief.html','entry-plan.html','client-product-brief.html']:
+    route_text = (ROOT / route).read_text(encoding='utf-8')
+    require('assets/brand/talentpluto-logo.jpg' in route_text, f'{route}: native TalentPluto logo missing')
+    require('brand-runtime.js' not in route_text and 'talentpluto-logo.svg' not in route_text, f'{route}: obsolete logo wrapper remains')
+    require(' download ' in route_text or ' download=' in route_text or '<a class="pill" download ' in route_text, f'{route}: native PDF download missing')
 
 expected_pages = {
     'Russell-Dudek-TalentPluto-Resume.pdf': 2,
@@ -57,4 +71,4 @@ if failures:
     for failure in failures:
         print(f'- {failure}')
     raise SystemExit(1)
-print('Source QA passed: preferred design, logo, artifacts, pagination, keyboard, reduced motion, and confidentiality.')
+print('Source QA passed: preferred design, exact supplied logo bytes, artifacts, pagination, keyboard, reduced motion, and confidentiality.')
