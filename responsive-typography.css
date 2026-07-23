@@ -1,0 +1,33 @@
+/* Responsive type guard: headings wrap only between words. */
+h1,
+h2,
+h3 {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+p {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.hero h1 {
+  max-width: 11.5ch;
+  text-wrap: balance;
+}
+
+.band-intro h2 {
+  max-width: 14ch;
+  text-wrap: balance;
+}
+
+@media (max-width: 640px) {
+  .hero h1 {
+    max-width: 100%;
+    font-size: clamp(3rem, 14.5vw, 4.75rem);
+    line-height: 0.92;
+    letter-spacing: -0.06em;
+    text-wrap: balance;
+  }
+}
