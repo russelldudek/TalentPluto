@@ -1,0 +1,1 @@
+Deploy and verify whole-word responsive heading wrapping.
