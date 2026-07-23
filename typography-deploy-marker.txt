@@ -1,1 +1,0 @@
-Deploy and verify the whole-word responsive heading fix.
